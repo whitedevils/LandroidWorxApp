@@ -6,4 +6,4 @@ I've a Landroid M500 and like many of us, i have noticed that the official app d
 
 So, pratically the web app has the main functionalities like the official app, is intuitive, very simple to understand the usage and grafically clean.
 
-You can reach web app at this link: https://landroidworxapp.azurewebsites.net/ and see how it works in Wiki
+You can reach web app at this link: https://landroidworxapp.azurewebsites.net/ and see how it works in [Wiki](https://github.com/whitedevils/LandroidWorxApp/wiki)
