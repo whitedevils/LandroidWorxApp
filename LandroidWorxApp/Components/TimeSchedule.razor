@@ -1,0 +1,106 @@
+﻿@using LandroidWorxApp.BusinessLogic
+@{
+    System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+    System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+}
+
+<Row Class="mt-4">
+    <Column ColumnSize="ColumnSize.Is5.Is4.OnDesktop">
+        <Field>
+            <FieldLabel><b>Time Start</b></FieldLabel>
+            <input type="time" class="form-control" value="@Planning.TimeStart.ToString(@"hh\:mm")" @onchange="@SetTime" />
+            @*<TextEdit Class="time-picker" Placeholder="00:00" Text="@Planning.TimeStart.ToString(@"hh\:mm")" TextChanged="SetTime">
+            </TextEdit>*@
+        </Field>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is4.Is3.OnDesktop">
+        <Field>
+            <FieldLabel><b>Duration</b></FieldLabel>
+            <NumericEdit TValue="int" @bind-Value="Planning.Duration" />
+        </Field>
+    </Column>
+    @if (Config.MultiZones != null && Config.MultiZones.Any(z => z > 0))
+    {
+        if (!Planning.Zone.HasValue) Planning.Zone = 0;
+        <Column ColumnSize="ColumnSize.Is3.Is3.OnDesktop">
+            <Field>
+                <FieldLabel><b>Zone</b></FieldLabel>
+                <Select TValue="int?" @bind-SelectedValue="Planning.Zone">
+                    @foreach (var item in Config.MultiZones)
+                    {
+                        if (item > 0)
+                        {
+                            <SelectItem Value="(int?)(Config.MultiZones.ToList().IndexOf(item))">@(Config.MultiZones.ToList().IndexOf(item) + 1)</SelectItem>
+                        }
+                    }
+                </Select>
+            </Field>
+        </Column>
+    }
+
+    <Column ColumnSize="ColumnSize.IsAuto" Class="align-self-center">
+        <Field>
+            <FieldLabel>&nbsp;</FieldLabel>
+            <Check @bind-Checked="Planning.CutEdge"><b>Cut Edge</b></Check>
+        </Field>
+    </Column>
+</Row>
+
+@if (ShowCallbacks)
+{
+
+    <Row Class="mt-2">
+        <Column ColumnSize="ColumnSize.Is8.Is4.OnDesktop">
+            <Field>
+                <FieldLabel><b>Callback Start (GET)</b></FieldLabel>
+                <TextEdit @bind-Text="Planning.CallbackStart" />
+            </Field>
+        </Column>
+        <Column ColumnSize="ColumnSize.Is4.Is2.OnDesktop">
+            <Field>
+                <FieldLabel><b>Start Delay</b></FieldLabel>
+                <NumericEdit TValue="int?" @bind-Value="Planning.CallbackStartDelaySeconds" Placeholder="sec" />
+            </Field>
+        </Column>
+        <Column ColumnSize="ColumnSize.Is8.Is4.OnDesktop">
+            <Field>
+                <FieldLabel><b>Callback End (GET)</b></FieldLabel>
+                <TextEdit @bind-Text="Planning.CallbackEnd" />
+            </Field>
+        </Column>
+        <Column ColumnSize="ColumnSize.Is4.Is2.OnDesktop">
+            <Field>
+                <FieldLabel><b>End Delay</b></FieldLabel>
+                <NumericEdit TValue="int?" @bind-Value="Planning.CallbackEndDelaySeconds" Placeholder="sec" />
+            </Field>
+        </Column>
+    </Row>
+
+}
+
+
+<Button Class="d-block mt-2" Color="Color.Danger" Clicked="DeleteTime">Delete Time</Button>
+
+
+<hr class="mb-2" />
+
+@code {
+
+    [Parameter]
+    public TimePlanning_BL Planning { get; set; }
+
+    [Parameter]
+    public LandroidWorxApp.BusinessLogic.Config Config { get; set; }
+
+    [Parameter]
+    public EventCallback DeleteTime { get; set; }
+
+    [Parameter]
+    public bool ShowCallbacks { get; set; }
+
+    void SetTime(ChangeEventArgs value)
+    {
+        if(!string.IsNullOrEmpty(value.Value.ToString()))
+            Planning.TimeStart = TimeSpan.Parse(value.Value.ToString());
+    }
+}

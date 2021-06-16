@@ -1,0 +1,128 @@
+﻿@page "/zones"
+@attribute [Authorize]
+
+@using LandroidWorxApp.BusinessLogic
+@using System.Security.Claims
+@using uPLibrary.Networking.M2Mqtt;
+@using uPLibrary.Networking.M2Mqtt.Messages;
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject ILsClientWeb LsClientWeb
+
+
+<Row>
+    @foreach (var item in zones)
+    {
+        if (item > 0)
+        {
+            int zone = item;
+            <Column ColumnSize="ColumnSize.Is4.Is3.OnDesktop">
+                <Field>
+                    <FieldLabel><b>Zone @(zones.IndexOf(item) + 1)</b></FieldLabel>
+                    <NumericEdit TValue="int" @bind-Value="zones[zones.IndexOf(item)]" />
+                </Field>
+            </Column>
+        }
+
+    }
+</Row>
+
+
+<Row Class="mt-3">
+    <Column>
+        <Button Color="Color.Info" Clicked="@AddZone">Add Zone</Button>
+        <Button Color="Color.Danger" Clicked="@DeleteZone">Delete Zone</Button>
+    </Column>
+    <Column Class="text-right">
+        <Button Color="Color.Success" Clicked="@SaveZones">Save Zones</Button>
+    </Column>
+</Row>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    ClaimsPrincipal user;
+    Interop interop;
+    string bearerToken = string.Empty;
+    string serialNumber = string.Empty;
+    string broker = string.Empty;
+    string cmdInPath = string.Empty;
+    string cmdOutPath = string.Empty;
+
+    List<int> zones = new List<int>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        interop = new Interop(JSRuntime);
+        var authState = await authenticationStateTask;
+        user = authState.User;
+        bearerToken = user.Claims.First(c => c.Type == "BearerToken").Value;
+        serialNumber = user.Claims.FirstOrDefault(c => c.Type == "SelectedProductSN")?.Value;
+        broker = user.Claims.First(c => c.Type == "BrokerUrl").Value;
+        cmdInPath = user.Claims.FirstOrDefault(c => c.Type == "CmdInPath")?.Value;
+        cmdOutPath = user.Claims.FirstOrDefault(c => c.Type == "CmdOutPath")?.Value;
+
+        if (string.IsNullOrWhiteSpace(serialNumber))
+            NavigationManager.NavigateTo("products");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await interop.Overlay(true);
+            await GetData();
+            await interop.Overlay(false);
+        }
+    }
+
+    public async Task GetData()
+    {
+        await interop.Overlay(true);
+        var status = await LsClientWeb.GetProductStatus(new LsClientWeb_GetProductStatusRequest() { BearerToken = bearerToken, SerianNumber = serialNumber });
+        zones = status.Status.Cfg.MultiZones?.Where(z => z > 0).ToList();
+        StateHasChanged();
+        await interop.Overlay(false);
+    }
+
+    private void AddZone()
+    {
+        if (zones.Count < 4)
+            zones.Add(1);
+    }
+
+    private void DeleteZone()
+    {
+        if (zones.Count > 0)
+            zones.RemoveAt(zones.Count - 1);
+    }
+
+    private async Task SaveZones()
+    {
+        await interop.Overlay(true);
+        string command = string.Format("{{\"mz\":[{0},{1},{2},{3}]}}", zones.ElementAtOrDefault<int>(0), zones.ElementAtOrDefault<int>(1), zones.ElementAtOrDefault<int>(2), zones.ElementAtOrDefault<int>(3));
+        var response = await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+        {
+            BearerToken = bearerToken,
+            Broker = broker,
+            Handler = Mqtt_MqttMsgPublished,
+            Content = command,
+            Uuid = Guid.NewGuid().ToString(),
+            CmdInPath = cmdInPath,
+            CmdOutPath = cmdOutPath
+        });
+    }
+
+    private void Mqtt_MqttMsgPublished(object sender, MqttMsgPublishedEventArgs e)
+    {
+        ((MqttClient)sender).Disconnect();
+
+        InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            await interop.Overlay(false);
+            await interop.ShowSwallAlert("success", "Save Zones", "Zones saved", "OK", null, null);
+        });
+    }
+}

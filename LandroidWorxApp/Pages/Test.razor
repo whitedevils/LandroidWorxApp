@@ -1,0 +1,58 @@
+﻿@page "/Test"
+@using LandroidWorxApp.BusinessLogic
+@using uPLibrary.Networking.M2Mqtt
+@using uPLibrary.Networking.M2Mqtt.Messages
+@using Microsoft.Extensions.Configuration
+@inject ILsClientWeb LsClientWeb
+@inject IConfiguration Configuration
+
+<h3>Test</h3>
+
+<span>@test</span>
+
+@code {
+        string test = "Loading";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await DoAction();
+    }
+
+    public async Task DoAction()
+    {
+        await Task.Delay(5000);
+        var response = await LsClientWeb.Login(new LsClientWeb_LoginRequest()
+        {
+            ClientSecret = Configuration.GetValue<string>("ClientSecret"),
+            GrantType = "password",
+            Scope = "*",
+            Username = "roberto.gualandris@hotmail.it",
+            Password = "ilguala11"
+        });
+
+        var products = await LsClientWeb.GetProducts(new LsClientWeb_GetProductsRequest() { BearerToken = response.BearerToken, Username = "roberto.gualandris@hotmail.it" });
+        var cmdInPath = products.Products.First().Topic.CmdIn;
+        var cmdOutPath = products.Products.First().Topic.CmdOut;
+        var msgSent = await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+        {
+            BearerToken = response.BearerToken,
+            Broker = response.BrokerUrl,
+            CmdInPath = cmdInPath,
+            CmdOutPath = cmdOutPath,
+            Uuid = Guid.NewGuid().ToString(),
+            Content = "{\"mzv\":[0,1,2,0,0,1,2,0,1,2]}",
+            Handler = Mqtt_MqttMsgPublished
+        });
+    }
+
+    public void Mqtt_MqttMsgPublished(object sender, MqttMsgPublishedEventArgs e)
+    {
+        ((MqttClient)sender).Disconnect();
+        test = "End";
+        
+        InvokeAsync(() =>
+        {
+            StateHasChanged();
+        });
+    }
+}

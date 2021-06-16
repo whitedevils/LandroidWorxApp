@@ -1,0 +1,439 @@
+﻿@page "/{donated?}"
+@attribute [Authorize]
+
+@using LandroidWorxApp.BusinessLogic
+@using Microsoft.Extensions.Configuration
+@using System.Globalization
+@using uPLibrary.Networking.M2Mqtt;
+@using uPLibrary.Networking.M2Mqtt.Messages;
+@inject ILsClientWeb LsClientWeb
+@inject IConfiguration Configuration
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject IManager Manager
+
+<div class="row">
+    <div class="col align-self-center battery">
+        <i class="fas fa-battery-@batteryStatus" style="font-size:2em;color:#cc5f28"></i> <span style="vertical-align:super">@data.Battery.Perc%</span>
+        <br />
+        <span class="info">@(data.Battery.Volt)V @(data.Battery.Temp)°</span>
+    </div>
+    <div class="col align-self-center status text-center">
+        <div><b>@data.LastState</b></div>
+    </div>
+    <div class="col align-self-center text-right wifi">
+        <i class="fas fa-wifi" style="font-size:2em;color:#cc5f28"></i>
+        <br />
+        <span class="info">@data.RecvSignal dB</span>
+    </div>
+</div>
+
+<div class="mt-3 text-center"><span class="info"><b>Next working hours:&nbsp;</b>@nextHours</span></div>
+<div class="mt-5 text-center status"><b>@productName</b></div>
+
+<div class="row mt-1">
+    <div class="col align-self-center text-center text-sm-right">
+        <span class="info">Slope: @data.Orient?[0]°</span>
+    </div>
+    <div class="col col-sm-auto text-center landroid">
+        <img src="/img/landroid.png" alt="Robertino Robottino" />
+    </div>
+    <div class="col align-self-center text-center text-sm-left">
+        <span class="info">Direction: @data.Orient?[2]°</span>
+    </div>
+</div>
+<div class="text-center">
+    <span class="info">Roll: @data.Orient?[1]°</span>
+</div>
+
+
+<div class="row mt-5">
+    <div class="col-md-6 col-lg-3">
+        <div class="row no-gutters">
+            <div class="col text-right">
+                <span><b>Next Zone:&nbsp;</b></span>
+            </div>
+            <div class="col">
+                <span>@(nextZone.HasValue? nextZone + 1 : nextZone)</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="row no-gutters">
+            <div class="col text-right">
+                <span><b>Moving Time:&nbsp;</b></span>
+            </div>
+            <div class="col">
+                <span>@TimeSpan.FromMinutes(data.Statistic.Blade).ToString(@"d\d\ h\h\ m\m")</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="row no-gutters">
+            <div class="col text-right">
+                <span><b>Distance:&nbsp;</b></span>
+            </div>
+            <div class="col">
+                <span>@data.Statistic.Distance m</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="row no-gutters">
+            <div class="col text-right">
+                <span><b>Working time:&nbsp;</b></span>
+            </div>
+            <div class="col">
+                <span>@TimeSpan.FromMinutes(data.Statistic.WorkTime).ToString(@"d\d\ h\h\ m\m")</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="text-center mt-3">
+    <span class="info"><b>Last update:</b>@config.LastUpdate</span> <br />
+    <span class="info">FW: @data.Firmware</span>
+</div>
+
+<div class="row justify-content-center mt-3 main-buttons">
+    <div class="col-6 col-sm-auto text-center py-2">
+        <button class="btn btn-primary" @onclick="Start"><i class="fas fa-play"></i> Start</button>
+    </div>
+    <div class="col-6 col-sm-auto text-center py-2">
+        <button class="btn btn-danger" @onclick="Stop"><i class="fas fa-square"></i> Stop</button>
+    </div>
+    <div class="col-6 col-sm-auto text-center py-2">
+        <button class="btn btn-success" @onclick="GoHome"><i class="fas fa-home"></i> Home</button>
+    </div>
+    <div class="col-6 col-sm-auto text-center py-2">
+        <button class="btn btn-secondary" @onclick="ShowModal"><i class="fas fa-hand-paper"></i> Manual</button>
+    </div>
+</div>
+
+<Modal @ref="modalRef">
+    <ModalContent Centered="true">
+        <ModalHeader>
+            <ModalTitle>Manual Actions</ModalTitle>
+            <CloseButton />
+        </ModalHeader>
+        <ModalBody Class="main-buttons">
+            <Row Class="py-2">
+                <Column ColumnSize="ColumnSize.Is6">
+                    <FieldLabel><b>Border Cut</b></FieldLabel>
+                </Column>
+                <Column ColumnSize="ColumnSize.Is6">
+                    <button class="btn btn-secondary d-inline" @onclick="BorderCut"><i class="fas fa-cut"></i> Cut</button>
+                </Column>
+            </Row>
+            <Row Class="py-2">
+                <Column ColumnSize="ColumnSize.Is6">
+                    <FieldLabel><b>Party Mode</b></FieldLabel>
+                </Column>
+                <Column ColumnSize="ColumnSize.Is6">
+                    <button class="btn btn-secondary d-inline" @onclick="TogglePartyMode"><i class="fas fa-glass-cheers"></i> @(config.Schedule.Mode == 2 ? "Disable" : "Enable")</button>
+                </Column>
+            </Row>
+            <hr />
+            <Row Class="pt-3">
+                <Column Class="align-self-center">
+                    <FieldLabel><b>One Time Work</b></FieldLabel>
+                    <button class="btn btn-secondary mt-3" @onclick="OnetimeStart"><i class="fas fa-play"></i> Start</button>
+                </Column>
+                <Column>
+                    <Field>
+                        <FieldLabel>Duration (minutes)</FieldLabel>
+                        <NumericEdit TValue="int" @bind-Value="oneTimeWorkMinutes"></NumericEdit>
+                    </Field>
+                    <Field>
+                        <FieldLabel>Zone</FieldLabel>
+                        <Select TValue="int?" @bind-SelectedValue="oneTimeWorkZone">
+                            @foreach (var item in config.MultiZones)
+                            {
+                                if (item > 0)
+                                {
+                                    <SelectItem Value="(int?)(config.MultiZones.ToList().IndexOf(item))">@(config.MultiZones.ToList().IndexOf(item) + 1)</SelectItem>
+                                }
+                            }
+                        </Select>
+                    </Field>
+                </Column>
+            </Row>
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideModal">Close</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code{
+    [Parameter]
+    public string Donated { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    Data data = new Data();
+    LandroidWorxApp.BusinessLogic.Config config = new LandroidWorxApp.BusinessLogic.Config() { Schedule = new Schedule(), MultiZones = new int[0] };
+    int? nextZone = null;
+    string nextHours = string.Empty;
+    string batteryStatus = "empty";
+    string bearerToken = string.Empty;
+    string username = string.Empty;
+    string serialNumber = string.Empty;
+    string broker = string.Empty;
+    string cmdInPath = string.Empty;
+    string cmdOutPath = string.Empty;
+    string productName = string.Empty;
+    Interop interop;
+    private Modal modalRef;
+    int oneTimeWorkMinutes;
+    int? oneTimeWorkZone;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationStateTask;
+        var user = authState.User;
+        bearerToken = user.Claims.First(c => c.Type == "BearerToken").Value;
+        broker = user.Claims.First(c => c.Type == "BrokerUrl").Value;
+        username = user.Identity.Name;
+        serialNumber = user.Claims.FirstOrDefault(c => c.Type == "SelectedProductSN")?.Value;
+        cmdInPath = user.Claims.FirstOrDefault(c => c.Type == "CmdInPath")?.Value;
+        cmdOutPath = user.Claims.FirstOrDefault(c => c.Type == "CmdOutPath")?.Value;
+        productName = user.Claims.FirstOrDefault(c => c.Type == "SelectedProductName")?.Value;
+        interop = new Interop(JSRuntime);
+
+
+        if (string.IsNullOrWhiteSpace(serialNumber))
+            NavigationManager.NavigateTo("products");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+            await interop.Overlay(true);
+            await GetData();
+            var nextPlanning = GetNextTimePlanning(Manager.GetTimePlannings(new GetTimePlanningsRequest() { Username = username, SerialNumber = serialNumber }).Plannings);
+            nextHours = $"{nextPlanning?.DayOfWeek.ToString()} {nextPlanning?.TimeStart.ToString(@"hh\:mm")}";
+            nextZone = nextPlanning?.Zone;
+            StateHasChanged();
+            await interop.Overlay(false);
+
+            if(Donated == "donated")
+                await interop.ShowSwallAlert("success", "Donation Received!", "Thanks for your support! \n This service will survive also thanks to your donation! Enjoy!", "OK", null, null);
+
+            if(null == await interop.ReadCookies("donation"))
+            {
+                await interop.ShowSwallAlert("info", "Donate for support!", "Hi! This service is completely free, and there is no advertisement!\n\n Unfortunately, in order to maintain the server and other stuff, it is necessary to pay a monthly expense.\n\n If you enjoy what this service offer you can help me donating a small amount by clicking to donate paypal button at the bottom of the page. I will apreciate your effort! Thanks! ", "OK", null, null);
+                await interop.WriteCookieAsync("donation", "hide", 30);
+            }
+        }
+    }
+
+    public async Task GetData()
+    {
+        await interop.Overlay(true);
+        LsClientWeb_GetProductStatusResponse status = new LsClientWeb_GetProductStatusResponse();
+        try
+        {
+            status = await LsClientWeb.GetProductStatus(new LsClientWeb_GetProductStatusRequest() { BearerToken = bearerToken, SerianNumber = serialNumber });
+            if (string.IsNullOrWhiteSpace(status.Status.Cfg.LastUpdate))
+                throw new Exception("Robot is offline");
+        }
+        catch (Exception ex)
+        {
+            await interop.Overlay(false);
+            await interop.ShowSwallAlert("error", "Attention", "Robot is offline for too much time. Last state is unknown.", "OK", null, null);
+            return;
+        }
+
+        data = status.Status.Dat;
+        config = status.Status.Cfg;
+        if (data.Battery.Perc > 90)
+            batteryStatus = "full";
+        else if (data.Battery.Perc > 60)
+            batteryStatus = "three-quarters";
+        else if (data.Battery.Perc > 40)
+            batteryStatus = "half";
+        else if (data.Battery.Perc > 15)
+            batteryStatus = "quarter";
+        else
+            batteryStatus = "empty";
+
+        if (config.MultiZones.Length > 0)
+            oneTimeWorkZone = 0;
+
+        //nextZone = config.MultiZones[0] > 0 ? (config.MultiZonePercs[data.LastZone] + 1).ToString() : "-";
+        await interop.Overlay(false);
+    }
+
+    public async Task Start()
+    {
+        await interop.Overlay(true);
+        var response = await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+        {
+            BearerToken = bearerToken,
+            Broker = broker,
+            Handler = Mqtt_MqttMsgPublished,
+            Content = "{\"cmd\":1}",
+            Uuid = Guid.NewGuid().ToString(),
+            CmdInPath = cmdInPath,
+            CmdOutPath = cmdOutPath
+        });
+    }
+
+    public async Task Stop()
+    {
+        await interop.Overlay(true);
+        var response = await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+        {
+            BearerToken = bearerToken,
+            Broker = broker,
+            Handler = Mqtt_MqttMsgPublished,
+            Content = "{\"cmd\":2}",
+            Uuid = Guid.NewGuid().ToString(),
+            CmdInPath = cmdInPath,
+            CmdOutPath = cmdOutPath
+        });
+    }
+
+    public async Task GoHome()
+    {
+        await interop.Overlay(true);
+        var response = await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+        {
+            BearerToken = bearerToken,
+            Broker = broker,
+            Handler = Mqtt_MqttMsgPublished,
+            Content = "{\"cmd\":3}",
+            Uuid = Guid.NewGuid().ToString(),
+            CmdInPath = cmdInPath,
+            CmdOutPath = cmdOutPath
+        });
+    }
+
+    public async Task BorderCut()
+    {
+        modalRef.Hide();
+        await interop.Overlay(true);
+        var response = await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+        {
+            BearerToken = bearerToken,
+            Broker = broker,
+            Handler = Mqtt_MqttMsgPublished,
+            Content = "{\"sc\":{\"ots\":{\"bc\":1,\"wtm\":0}}}",
+            Uuid = Guid.NewGuid().ToString(),
+            CmdInPath = cmdInPath,
+            CmdOutPath = cmdOutPath
+        });
+    }
+
+    public async Task OnetimeStart()
+    {
+        modalRef.Hide();
+        await interop.Overlay(true);
+        if (oneTimeWorkMinutes < 10)
+        {
+            await interop.Overlay(false);
+            await interop.ShowSwallAlert("warning", "Attention", "Duration can not be less then 10 minutes", "OK", null, null);
+            return;
+        }
+
+
+        if (oneTimeWorkZone.HasValue)
+        {
+            var zoneCommand = "{\"mzv\":[{0},{0},{0},{0},{0},{0},{0},{0},{0},{0}]}".Replace("{0}", oneTimeWorkZone.ToString());
+
+            await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+            {
+                BearerToken = bearerToken,
+                Broker = broker,
+                Handler = CommandZonePublished,
+                Content = zoneCommand,
+                Uuid = Guid.NewGuid().ToString(),
+                CmdInPath = cmdInPath,
+                CmdOutPath = cmdOutPath
+            });
+
+        }
+        else
+        {
+            var response = await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+            {
+                BearerToken = bearerToken,
+                Broker = broker,
+                Handler = Mqtt_MqttMsgPublished,
+                Content = "{\"sc\":{\"ots\":{\"bc\":0,\"wtm\":" + oneTimeWorkMinutes + "}}}",
+                Uuid = Guid.NewGuid().ToString(),
+                CmdInPath = cmdInPath,
+                CmdOutPath = cmdOutPath
+            });
+        }
+    }
+
+    public async Task TogglePartyMode()
+    {
+        modalRef.Hide();
+        await interop.Overlay(true);
+        string mode = config.Schedule.Mode == 2 ? "1" : "2";
+        config.Schedule.Mode = config.Schedule.Mode == 2 ? 1 : 2;
+        var response = await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+        {
+            BearerToken = bearerToken,
+            Broker = broker,
+            Handler = Mqtt_MqttMsgPublished,
+            Content = "{\"sc\":{ \"m\":" + (mode) + ", \"distm\": 0}}",
+            Uuid = Guid.NewGuid().ToString(),
+            CmdInPath = cmdInPath,
+            CmdOutPath = cmdOutPath
+        });
+
+    }
+
+    public void Mqtt_MqttMsgPublished(object sender, MqttMsgPublishedEventArgs e)
+    {
+        ((MqttClient)sender).Disconnect();
+
+        InvokeAsync(async () =>
+        {
+            await Task.Delay(2000);
+            await GetData();
+            StateHasChanged();
+            await interop.Overlay(false);
+        });
+    }
+
+    public async void CommandZonePublished(object sender, MqttMsgPublishedEventArgs e)
+    {
+        await Task.Delay(2000);
+
+        await LsClientWeb.PublishCommand(new LsClientWeb_PublishCommandRequest()
+        {
+            BearerToken = bearerToken,
+            Broker = broker,
+            Handler = Mqtt_MqttMsgPublished,
+            Content = "{\"sc\":{\"ots\":{\"bc\":0,\"wtm\":" + oneTimeWorkMinutes + "}}}",
+            Uuid = Guid.NewGuid().ToString(),
+            CmdInPath = cmdInPath,
+            CmdOutPath = cmdOutPath
+        });
+    }
+
+    public TimePlanning_BL GetNextTimePlanning(List<TimePlanning_BL> list)
+    {
+        return list.Where(p => (p.DayOfWeek == DateTime.Now.DayOfWeek && p.TimeStart >= DateTime.Now.TimeOfDay) || p.DayOfWeek > DateTime.Now.DayOfWeek).Any() ?
+               list.Where(p => (p.DayOfWeek == DateTime.Now.DayOfWeek && p.TimeStart >= DateTime.Now.TimeOfDay) || p.DayOfWeek > DateTime.Now.DayOfWeek).OrderBy(p => p.DayOfWeek).ThenBy(p => p.TimeStart).First() :
+               list.Where(p => (p.DayOfWeek == DateTime.Now.DayOfWeek && p.TimeStart <= DateTime.Now.TimeOfDay) || p.DayOfWeek < DateTime.Now.DayOfWeek).OrderBy(p => p.DayOfWeek).ThenBy(p => p.TimeStart).FirstOrDefault();
+    }
+
+    private void ShowModal()
+    {
+        modalRef.Show();
+    }
+
+    private void HideModal()
+    {
+        modalRef.Hide();
+    }
+}

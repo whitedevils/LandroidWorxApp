@@ -1,0 +1,95 @@
+﻿@page "/products"
+@attribute [Authorize]
+@using LandroidWorxApp.BusinessLogic
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http
+@inject ILsClientWeb LsClientWeb
+@inject HttpContextAccessor Context
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<Row Class="justify-content-center">
+    @foreach (var item in products)
+    {
+        string pinCode = item.Pin;
+        <Column ColumnSize="ColumnSize.Is6.OnTablet.Is4.OnFullHD">
+            <div class="product text-center p-3" @onclick="() => SelectProduct(item)">
+                <img src="/img/landroid.png" alt="@item.Name" />
+                <h2>@item.Name</h2>
+                <div class="text-left">
+                    <span><b>Serial N:</b> @item.SerialNo</span>
+                    <br />
+                    <Row>
+                        <Column>
+                            <span><b>Pin Code:</b> <TextEdit Class="d-inline" IsPlaintext="true" IsDisabled="true" Role="@role" @bind-Text="@pinCode" /></span>
+                        </Column>
+                        <Column ColumnSize="ColumnSize.IsAuto"><button class="btn pull-right" @onmouseover="TogglePinCode" @onmouseout="TogglePinCode" @ontouchstart="TogglePinCode" @ontouchend="TogglePinCode"><i class="fas @(iconClass)"></i></button></Column>
+                    </Row>
+                </div>
+            </div>
+        </Column>
+    }
+
+</Row>
+
+
+
+@code {
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    ClaimsPrincipal user;
+    Interop interop;
+    List<LsProductItem> products = new List<LsProductItem>();
+    string bearerToken;
+    string username;
+    string iconClass = "fas fa-eye";
+    TextRole role = TextRole.Password;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationStateTask;
+        user = authState.User;
+        bearerToken = user.Claims.First(c => c.Type == "BearerToken").Value;
+        username = user.Identity.Name;
+        interop = new Interop(JSRuntime);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await interop.Overlay(true);
+            var response = await LsClientWeb.GetProducts(new LsClientWeb_GetProductsRequest() { BearerToken = bearerToken, Username = username });
+            products = response.Products;
+            StateHasChanged();
+            await interop.Overlay(false);
+        }
+
+    }
+
+    private async void SelectProduct(LsProductItem product)
+    {
+        var interop = new Interop(JSRuntime);
+        string antiforgerytoken = await interop.GetElementByName("__RequestVerificationToken");
+        var fields = new { __RequestVerificationToken = antiforgerytoken, serialNo = product.SerialNo, productName = product.Name, cmdInPath = product.Topic.CmdIn, cmdOutPath = product.Topic.CmdOut, returnUrl = "/" };
+        await interop.SubmitForm("/updateClaims/", fields);
+    }
+
+    private void TogglePinCode()
+    {
+        if (role == TextRole.Password)
+        {
+            role = TextRole.Text;
+            iconClass = "fas fa-eye-slash";
+        }
+        else
+        {
+            role = TextRole.Password;
+            iconClass = "fas fa-eye";
+        }
+
+        StateHasChanged();
+    }
+}

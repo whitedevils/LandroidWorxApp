@@ -1,0 +1,205 @@
+﻿@page "/scheduler"
+@attribute [Authorize]
+
+@using System.Globalization
+@using LandroidWorxApp.BusinessLogic
+@using Microsoft.Extensions.Configuration
+@using uPLibrary.Networking.M2Mqtt;
+@using uPLibrary.Networking.M2Mqtt.Messages;
+@using LandroidWorxApp.Components;
+@inject ILsClientWeb LsClientWeb
+@inject IManager Manager
+@inject IConfiguration Configuration
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<Tabs SelectedTab="@selectedTab" SelectedTabChanged="OnSelectedTab" Pills="true" Justified="true" Class="days mx-n4">
+    <Items>
+
+        <Tab Name="@DayOfWeek.Monday.ToString()" >@CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames[(int)DayOfWeek.Monday].ToUpper()</Tab>
+        <Tab Name="@DayOfWeek.Tuesday.ToString()" >@CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames[(int)DayOfWeek.Tuesday].ToUpper()</Tab>
+        <Tab Name="@DayOfWeek.Wednesday.ToString()" >@CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames[(int)DayOfWeek.Wednesday].ToUpper()</Tab>
+        <Tab Name="@DayOfWeek.Thursday.ToString()" >@CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames[(int)DayOfWeek.Thursday].ToUpper()</Tab>
+        <Tab Name="@DayOfWeek.Friday.ToString()" >@CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames[(int)DayOfWeek.Friday].ToUpper()</Tab>
+        <Tab Name="@DayOfWeek.Saturday.ToString()" >@CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames[(int)DayOfWeek.Saturday].ToUpper()</Tab>
+        <Tab Name="@DayOfWeek.Sunday.ToString()" >@CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames[(int)DayOfWeek.Sunday].ToUpper()</Tab>
+
+    </Items>
+</Tabs>
+
+
+<TabsContent @ref="days">
+
+    <TabPanel Name="@DayOfWeek.Monday.ToString()">
+        @foreach (var item in Plannings.Where(p => p.DayOfWeek == DayOfWeek.Monday).OrderBy(p => p.TimeStart))
+        {
+            var planning = item;
+            <TimeSchedule @key="item.Id" Planning="planning" Config=config DeleteTime="() => DeleteTimeSchedule(planning)" ShowCallbacks="showCallback" />
+        }
+
+    </TabPanel>
+    <TabPanel Name="@DayOfWeek.Tuesday.ToString()">
+        @foreach (var item in Plannings.Where(p => p.DayOfWeek == DayOfWeek.Tuesday).OrderBy(p => p.TimeStart))
+        {
+            var planning = item;
+            <TimeSchedule @key="item.Id" Planning="planning" Config=config DeleteTime="() => DeleteTimeSchedule(planning)" ShowCallbacks="showCallback" />
+        }
+    </TabPanel>
+    <TabPanel Name="@DayOfWeek.Wednesday.ToString()">
+        @foreach (var item in Plannings.Where(p => p.DayOfWeek == DayOfWeek.Wednesday).OrderBy(p => p.TimeStart))
+        {
+            var planning = item;
+            <TimeSchedule @key="item.Id" Planning="planning" Config=config DeleteTime="() => DeleteTimeSchedule(planning)" ShowCallbacks="showCallback" />
+        }
+    </TabPanel>
+    <TabPanel Name="@DayOfWeek.Thursday.ToString()">
+        @foreach (var item in Plannings.Where(p => p.DayOfWeek == DayOfWeek.Thursday).OrderBy(p => p.TimeStart))
+        {
+            var planning = item;
+            <TimeSchedule @key="item.Id" Planning="planning" Config=config DeleteTime="() => DeleteTimeSchedule(planning)" ShowCallbacks="showCallback" />
+        }
+    </TabPanel>
+    <TabPanel Name="@DayOfWeek.Friday.ToString()">
+        @foreach (var item in Plannings.Where(p => p.DayOfWeek == DayOfWeek.Friday).OrderBy(p => p.TimeStart))
+        {
+            var planning = item;
+            <TimeSchedule @key="item.Id" Planning="planning" Config=config DeleteTime="() => DeleteTimeSchedule(planning)" ShowCallbacks="showCallback"  />
+        }
+    </TabPanel>
+    <TabPanel Name="@DayOfWeek.Saturday.ToString()">
+        @foreach (var item in Plannings.Where(p => p.DayOfWeek == DayOfWeek.Saturday).OrderBy(p => p.TimeStart))
+        {
+            var planning = item;
+            <TimeSchedule @key="item.Id" Planning="planning" Config=config DeleteTime="() => DeleteTimeSchedule(planning)" ShowCallbacks="showCallback" />
+        }
+    </TabPanel>
+    <TabPanel Name="@DayOfWeek.Sunday.ToString()">
+        @foreach (var item in Plannings.Where(p => p.DayOfWeek == DayOfWeek.Sunday).OrderBy(p => p.TimeStart))
+        {
+            var planning = item;
+            <TimeSchedule @key="item.Id" Planning="planning" Config=config DeleteTime="() => DeleteTimeSchedule(planning)" ShowCallbacks="showCallback" />
+        }
+    </TabPanel>
+
+</TabsContent>
+
+<Row Class="mt-4">
+    <Column ColumnSize="ColumnSize.Is1" Class="align-self-center text-center">
+        <span><b>@config.Schedule.Perc</b></span>
+    </Column>
+    <Column>
+        <Field>
+            <label for="work-percentage"><b>Work Percentage</b></label>
+            <input type="range" class="form-control-range" id="work-percentage" step="10" min="-100" max="100" @bind-value="config.Schedule.Perc" />
+        </Field>
+    </Column>
+</Row>
+
+
+<Row Class="mt-2">
+    <Column>
+        <Button Color="Color.Info" Clicked="@AddTimeSchedule">Add Time</Button>
+    </Column>
+    <Column Class="text-right">
+        <Button Color="Color.Success" Clicked="@OnButtonClicked">Save Scheduler</Button>
+    </Column>
+</Row>
+
+@code
+{
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    TextEdit timeStart;
+    string selectedTab = DateTime.Now.DayOfWeek.ToString();
+    TabsContent days;
+
+    Data data = new Data();
+    LandroidWorxApp.BusinessLogic.Config config = new LandroidWorxApp.BusinessLogic.Config();
+    List<TimePlanning_BL> Plannings = new List<TimePlanning_BL>();
+    Interop interop;
+
+    string bearerToken = string.Empty;
+    string serialNumber = string.Empty;
+    string broker = string.Empty;
+    string username = string.Empty;
+    bool showCallback = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationStateTask;
+        var user = authState.User;
+        bearerToken = user.Claims.First(c => c.Type == "BearerToken").Value;
+        broker = user.Claims.First(c => c.Type == "BrokerUrl").Value;
+        username = user.Identity.Name;
+        showCallback = username?.ToLower() == "roberto.gualandris@hotmail.it";
+        serialNumber = user.Claims.FirstOrDefault(c => c.Type == "SelectedProductSN")?.Value;
+        interop = new Interop(JSRuntime);
+        if (string.IsNullOrWhiteSpace(serialNumber))
+        {
+            NavigationManager.NavigateTo("products");
+            return;
+        }
+
+
+        GetTimePannings();
+        await GetData();
+        days.SelectPanel(selectedTab);
+    }
+
+    private void OnSelectedTab(string tab)
+    {
+        selectedTab = tab;
+        days.SelectPanel(tab);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        //if (firstRender)
+        //    await interop.RenderPickers("time-picker");
+    }
+
+    private async Task GetData()
+    {
+        var status = await LsClientWeb.GetProductStatus(new LsClientWeb_GetProductStatusRequest() { BearerToken = bearerToken, SerianNumber = serialNumber });
+        data = status.Status.Dat;
+        config = status.Status.Cfg;
+    }
+
+    private void GetTimePannings()
+    {
+        var response = Manager.GetTimePlannings(new GetTimePlanningsRequest() { Username = username, SerialNumber = serialNumber });
+        Plannings = response.Plannings;
+    }
+
+
+    public async Task OnButtonClicked()
+    {
+        var interop = new Interop(JSRuntime);
+        await interop.Overlay(true);
+        if (Plannings.Any(p => p.Duration <= 0))
+        {
+            await interop.Overlay(false);
+            await interop.ShowSwallAlert("warning", "Attention", "Duration can not be equal or less then 0", "OK", null, null);
+            return;
+        }
+        Plannings.ForEach(x => x.RobotSerialNumber = serialNumber);
+        Manager.SaveTimePlanningsRequest(new SaveTimePlanningsRequest() { Username = username, Plannings = Plannings, SerialNumber = serialNumber, WorkPercentage = config.Schedule.Perc });
+        await interop.Overlay(false);
+        await interop.ShowSwallAlert("success", "Save Scheduler", "Scheduler saved", "OK", null, null);
+    }
+
+    public async Task AddTimeSchedule()
+    {
+        Plannings.Add(new TimePlanning_BL() { DayOfWeek = (DayOfWeek)Enum.Parse(typeof(DayOfWeek), selectedTab) , Username = username, });
+        //await Task.Delay(500);
+        //await interop.RenderPickers("time-picker");
+    }
+
+    public void DeleteTimeSchedule(TimePlanning_BL time)
+    {
+        Plannings.Remove(time);
+    }
+
+
+}

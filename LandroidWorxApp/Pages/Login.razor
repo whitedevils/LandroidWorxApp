@@ -1,0 +1,61 @@
+﻿@page "/Login"
+@page "/Login/{error}"
+@using LandroidWorxApp.BusinessLogic
+@using Microsoft.Extensions.Configuration
+@using Microsoft.AspNetCore.Http
+@inject ILsClientWeb LsClientWeb
+@inject IConfiguration Configuration
+@inject IJSRuntime JsRuntime
+
+
+<Row Class="justify-content-center">
+    <Column ColumnSize="ColumnSize.IsAuto">
+        <Field>
+            <FieldLabel>Username</FieldLabel>
+            <TextEdit @bind-Text="Username">
+            </TextEdit>
+        </Field>
+        <Field>
+            <FieldLabel>Password</FieldLabel>
+            <TextEdit Role="TextRole.Password" @bind-Text="Password">
+            </TextEdit>
+        </Field>
+        <Field>
+            <Check @bind-Checked="RememberMe">Remember me</Check>
+        </Field>
+
+        <div class="mt-2 alert alert-danger text-center @alert" role="alert">
+            Invalid credentials. Retry
+        </div>
+
+        <Button Color="Color.Info" Clicked="LoginUser">Login</Button>
+
+
+    </Column>
+</Row>
+
+@code {
+
+    [Parameter]
+    public string Error { get; set; }
+
+    string Username;
+    string Password;
+    bool RememberMe;
+    string alert = "d-none";
+
+    protected override void OnInitialized()
+    {
+        if(Error == "invalidAuth")
+              alert = "d-block";
+    }
+
+    private async void LoginUser()
+    {
+        var interop = new Interop(JsRuntime);
+        string antiforgerytoken = await interop.GetElementByName("__RequestVerificationToken");
+        var fields = new { __RequestVerificationToken = antiforgerytoken, username = Username, password = Password, rememberMe = RememberMe };
+        await interop.SubmitForm("/loginaction/", fields);
+    }
+
+}

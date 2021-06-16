@@ -1,0 +1,69 @@
+﻿@page "/activities"
+@attribute [Authorize]
+
+@using System.Globalization
+@using LandroidWorxApp.BusinessLogic
+@using Microsoft.Extensions.Configuration
+@using uPLibrary.Networking.M2Mqtt;
+@using uPLibrary.Networking.M2Mqtt.Messages;
+@using LandroidWorxApp.Components;
+@inject ILsClientWeb LsClientWeb
+@inject IManager Manager
+@inject IConfiguration Configuration
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+
+@foreach (var activity in activities)
+{
+    <Alert Color="activity.Payload.Dat.LastError != ErrorCode.NONE ? Color.Danger : Color.Info" Visible="true">
+        <AlertMessage>@(activity.Payload.Dat.LastError != ErrorCode.NONE ? activity.Payload.Dat.LastError.ToString() : activity.Payload.Dat.LastState == StatusCode.APP_WIRE_FOLLOW_AREA_SEARCH || activity.Payload.Dat.LastState == StatusCode.GRASS_CUTTING ? $"{activity.Payload.Dat.LastState} Zone {activity.Payload.Cfg.MultiZonePercs[activity.Payload.Dat.LastZone] + 1}" : activity.Payload.Dat.LastState.ToString())</AlertMessage>
+        <div>
+            @DateTime.Parse(activity.Stamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal).ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+        </div>
+    </Alert>
+}
+
+
+@code
+{
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+
+    List<Activity> activities = new List<Activity>();
+    Interop interop;
+    string bearerToken = string.Empty;
+    string serialNumber = string.Empty;
+    string broker = string.Empty;
+    string username = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationStateTask;
+        var user = authState.User;
+        bearerToken = user.Claims.First(c => c.Type == "BearerToken").Value;
+        broker = user.Claims.First(c => c.Type == "BrokerUrl").Value;
+        username = user.Identity.Name;
+        serialNumber = user.Claims.FirstOrDefault(c => c.Type == "SelectedProductSN")?.Value;
+        interop = new Interop(JSRuntime);
+        if (string.IsNullOrWhiteSpace(serialNumber))
+        {
+            NavigationManager.NavigateTo("products");
+            return;
+        }
+
+        await GetData();
+
+    }
+
+
+    private async Task GetData()
+    {
+        await interop.Overlay(true);
+        var response = await LsClientWeb.GetProductActivity(new LsClientWeb_GetProductActivitiesRequest() { BearerToken = bearerToken, SerianNumber = serialNumber });
+        activities = response.Activities;
+        await interop.Overlay(false);
+    }
+
+}
