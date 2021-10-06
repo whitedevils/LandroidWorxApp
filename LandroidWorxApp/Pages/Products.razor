@@ -44,6 +44,7 @@
     List<LsProductItem> products = new List<LsProductItem>();
     string bearerToken;
     string username;
+    string serialNumber;
     string iconClass = "fas fa-eye";
     TextRole role = TextRole.Password;
 
@@ -51,9 +52,13 @@
     {
         var authState = await authenticationStateTask;
         user = authState.User;
+        serialNumber = user.Claims.FirstOrDefault(c => c.Type == "SelectedProductSN")?.Value;
         bearerToken = user.Claims.First(c => c.Type == "BearerToken").Value;
         username = user.Identity.Name;
         interop = new Interop(JSRuntime);
+
+        if (!string.IsNullOrWhiteSpace(serialNumber))
+            NavigationManager.NavigateTo("index");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

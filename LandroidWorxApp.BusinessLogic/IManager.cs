@@ -8,6 +8,7 @@ namespace LandroidWorxApp.BusinessLogic
 {
     public interface IManager
     {
+        void DeleteUserData(string username);
         Task ExecuteCallback(string url);
         GetTimePlanningsResponse GetTimePlannings(GetTimePlanningsRequest request);
         Task ResetTimeCommand(ResetTimePlanCommandRequest command);

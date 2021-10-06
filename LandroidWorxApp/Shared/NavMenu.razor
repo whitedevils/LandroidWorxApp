@@ -1,4 +1,10 @@
-﻿<div class="top-row pl-4 navbar navbar-dark">
+﻿@inject IJSRuntime JSRuntime
+@inject Callbacker Callbacker
+@inject NavigationManager NavigationManager
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Http
+
+<div class="top-row pl-4 navbar navbar-dark">
     <a class="navbar-brand" href="">LandroidWorxApp</a>
     <button class="navbar-toggler" @onclick="ToggleNavMenu">
         <span class="navbar-toggler-icon"></span>
@@ -32,16 +38,47 @@
                 <span class="oi oi-list-rich" aria-hidden="true"></span> Activities
             </NavLink>
         </li>
+        <li class="nav-item px-3 d-md-none d-lg-none">
+            <NavLink class="nav-link " href="javascript:location.href='/logoutaction'">
+                <span class="oi oi-account-logout" aria-hidden="true"></span> Logout
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="#" @onclick="DeleteUser">
+                <span class="oi oi-circle-x" aria-hidden="true"></span> Delete User
+            </NavLink>
+        </li>
     </ul>
 </div>
 
 @code {
-    bool collapseNavMenu = true;
 
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+    ClaimsPrincipal user;
+    bool collapseNavMenu = true;
+    Interop interop;
     string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    public static object CreateDotNetObjectRefSyncObj = new object();
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationStateTask;
+        user = authState.User;
+        interop = new Interop(JSRuntime);
+    }
 
     void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    //The button onclick will call this.
+    void DeleteUser()
+    {
+        if(user.Identity.Name != null)
+            JSRuntime.InvokeAsync<object>("interop.showDeleteUserAlert", "warning", "Attention", "Are you sure to completely delete all user data?", "Confirm", "Cancel");
     }
 }

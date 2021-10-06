@@ -99,6 +99,23 @@
             },
         }).then(callback);
     },
+    showDeleteUserAlert: function (type, title, message, confirmBtnText, cancelBtnText) {
+        
+        swal({
+            title: title,
+            text: message,
+            icon: type,
+            buttons: {
+                cancel: cancelBtnText != null ? cancelBtnText : false,
+                confirm: confirmBtnText != null ? confirmBtnText : false,
+            },
+        }).then(function (data) {
+            
+            if (data) {
+                location.href = "/DeleteUserData";
+            }
+        });
+    },
     hideOverlay: function (callback) {
         if ($('#overlay')) {
             $('#overlay').hide(callback);
@@ -136,7 +153,8 @@
             }
         }
         return null;
-    }
+    },
+
 };
 
 

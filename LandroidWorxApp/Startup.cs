@@ -40,6 +40,7 @@ namespace LandroidWorxApp
             services.AddServerSideBlazor();
             services.AddSingleton<ILsClientWeb>(x => new LsClientWeb(Configuration, "LandroidWorxAppData"));
             services.AddSingleton<IManager>(x => new Manager(Configuration, "LandroidWorxAppData"));
+            services.AddScoped<Callbacker>();
             services.AddBlazorise(options =>
              {
                  options.ChangeTextOnKeyPress = false; // optional

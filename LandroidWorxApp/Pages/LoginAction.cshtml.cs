@@ -69,6 +69,8 @@ namespace LandroidWorxApp.Pages
             var authProperties = new AuthenticationProperties
             {
                 IsPersistent = rememberMe,
+                AllowRefresh = rememberMe,
+                ExpiresUtc = rememberMe ? DateTime.Now.AddYears(1) : (DateTime?)null,
                 RedirectUri = this.Request.Host.Value
             };
             try

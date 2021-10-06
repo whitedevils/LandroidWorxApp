@@ -32,6 +32,20 @@ namespace LandroidWorxApp.BusinessLogic
             _telemetryClient = new TelemetryClient();
         }
 
+        public void DeleteUserData(string username)
+        {
+            _repoManager.GenericOperations.DeleteByExpression<UserProduct>(x => x.Username == username);
+            _repoManager.GenericOperations.DeleteByExpression<UserData>(x => x.Username == username);
+            var plannings = _repoManager.GenericOperations.GetByExpression<TimePlanning>(x => x.Username == username);
+            foreach (var item in plannings)
+            {
+                RecurringJob.RemoveIfExists(item.Id.ToString());
+                RecurringJob.RemoveIfExists(string.Format("cbkStart_{0}", item.Id));
+                RecurringJob.RemoveIfExists(string.Format("cbkEnd_{0}", item.Id));
+            }
+            _repoManager.GenericOperations.DeleteAll(plannings);
+        }
+
 
         public GetTimePlanningsResponse GetTimePlannings(GetTimePlanningsRequest request)
         {
