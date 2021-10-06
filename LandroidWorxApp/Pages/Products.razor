@@ -57,8 +57,6 @@
         username = user.Identity.Name;
         interop = new Interop(JSRuntime);
 
-        if (!string.IsNullOrWhiteSpace(serialNumber))
-            NavigationManager.NavigateTo("index");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
